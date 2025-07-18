@@ -33,6 +33,7 @@ import {
   Truck,
   LogOut,
   RefreshCw,
+  Download,
 } from "lucide-react"
 
 // --- safe JSON helper -------------------------------------------------------
@@ -52,6 +53,82 @@ async function parseResponse<T = any>(res: Response): Promise<{ ok: boolean; dat
     console.error("Response parsing error:", err)
     return { ok: false, error: "Failed to parse server response" }
   }
+}
+
+// PDF generation utility
+const generatePDF = (request: VehicleRequest) => {
+  const content = `
+    VEHICLE REQUEST FORM - CSIR-CRRI
+    
+    Request ID: ${request.id}
+    Status: ${request.status.toUpperCase()}
+    
+    BASIC INFORMATION:
+    Date of Indent: ${request.dateOfIndent}
+    Vehicle Type: ${request.vehicleType}
+    Date of Duty: ${request.dateOfDuty}
+    Division/Section: ${request.division}
+    Booking Time: ${request.bookingTimeFrom} - ${request.bookingTimeTo}
+    Contact Number: ${request.contactNumber}
+    
+    TRAVEL DETAILS:
+    Place to Visit: ${request.placeToVisit}
+    Purpose of Visit: ${request.purposeOfVisit}
+    
+    PERSONS TO BE PICKED:
+    ${request.persons
+      .map(
+        (person, index) => `
+    ${index + 1}. Name: ${person.name}
+       ID No: ${person.idNo}
+       From: ${person.from}
+       To: ${person.to}
+       CRRI: ${person.crri ? "Yes" : "No"}
+    `,
+      )
+      .join("")}
+    
+    ${
+      request.vehicleAssigned
+        ? `
+    VEHICLE ASSIGNMENT:
+    Vehicle Number: ${request.vehicleAssigned}
+    ${request.driverAssigned ? `Driver: ${request.driverAssigned}` : ""}
+    `
+        : ""
+    }
+    
+    ${
+      request.comments.length > 0
+        ? `
+    COMMENTS:
+    ${request.comments
+      .map(
+        (comment) => `
+    ${comment.by} (${new Date(comment.at).toLocaleString()}):
+    ${comment.text}
+    `,
+      )
+      .join("")}
+    `
+        : ""
+    }
+    
+    Submitted by: ${request.submittedBy}
+    Submitted on: ${new Date(request.submittedAt).toLocaleString()}
+    ${request.approvedBy ? `Approved by: ${request.approvedBy} on ${new Date(request.approvedAt!).toLocaleString()}` : ""}
+  `
+
+  // Create and download the PDF-like text file
+  const blob = new Blob([content], { type: "text/plain" })
+  const url = window.URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = `vehicle-request-${request.id}.txt`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  window.URL.revokeObjectURL(url)
 }
 
 interface VehicleRequest {
@@ -388,6 +465,15 @@ export default function RequestsPage() {
                       </div>
                       <div className="flex items-center space-x-2">
                         {getStatusBadge(request.status)}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => generatePDF(request)}
+                          className="bg-blue-50 hover:bg-blue-100"
+                        >
+                          <Download className="h-4 w-4 mr-2" />
+                          Download PDF
+                        </Button>
                         <Dialog>
                           <DialogTrigger asChild>
                             <Button variant="outline" size="sm" onClick={() => setSelectedRequest(request)}>
@@ -397,7 +483,18 @@ export default function RequestsPage() {
                           </DialogTrigger>
                           <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
                             <DialogHeader>
-                              <DialogTitle>Request Details - {request.id}</DialogTitle>
+                              <DialogTitle className="flex items-center justify-between">
+                                <span>Request Details - {request.id}</span>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => generatePDF(request)}
+                                  className="ml-4"
+                                >
+                                  <Download className="h-4 w-4 mr-2" />
+                                  Download PDF
+                                </Button>
+                              </DialogTitle>
                               <DialogDescription>Complete information about this vehicle request</DialogDescription>
                             </DialogHeader>
 
@@ -596,6 +693,46 @@ export default function RequestsPage() {
                                         >
                                           <Truck className="h-4 w-4 mr-2" />
                                           Assign Vehicle
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                {/* Update Vehicle Assignment for Transport Head */}
+                                {canAssignVehicle &&
+                                  selectedRequest.status === "approved" &&
+                                  selectedRequest.vehicleAssigned && (
+                                    <div className="border-t pt-4">
+                                      <Label className="font-medium">Update Vehicle Assignment</Label>
+                                      <div className="mt-4 space-y-4">
+                                        <Textarea
+                                          placeholder="Add a comment..."
+                                          value={actionData.comment}
+                                          onChange={(e) => setActionData({ ...actionData, comment: e.target.value })}
+                                        />
+                                        <div className="grid grid-cols-2 gap-4">
+                                          <Input
+                                            placeholder="New Vehicle Number"
+                                            value={actionData.vehicleAssigned}
+                                            onChange={(e) =>
+                                              setActionData({ ...actionData, vehicleAssigned: e.target.value })
+                                            }
+                                          />
+                                          <Input
+                                            placeholder="New Driver Name"
+                                            value={actionData.driverAssigned}
+                                            onChange={(e) =>
+                                              setActionData({ ...actionData, driverAssigned: e.target.value })
+                                            }
+                                          />
+                                        </div>
+                                        <Button
+                                          onClick={() => handleAction("assign_vehicle", selectedRequest.id)}
+                                          disabled={actionLoading || !actionData.vehicleAssigned}
+                                          className="bg-orange-600 hover:bg-orange-700"
+                                        >
+                                          <Truck className="h-4 w-4 mr-2" />
+                                          Update Assignment
                                         </Button>
                                       </div>
                                     </div>
