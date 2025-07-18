@@ -1,5 +1,19 @@
 import type { NextRequest } from "next/server"
-import { createApiResponse, createErrorResponse } from "@/lib/auth-utils"
+
+// Local JSON helpers (avoid importing utils that pull in node-only deps)
+function createApiResponse(data: any, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "content-type": "application/json" },
+  })
+}
+
+function createErrorResponse(message: string, status = 400) {
+  return new Response(JSON.stringify({ error: message }), {
+    status,
+    headers: { "content-type": "application/json" },
+  })
+}
 
 // util: return epoch ms or null
 function toEpoch(value: string | null): number | null {
@@ -79,20 +93,7 @@ const vehicleRequests: any[] = [
 ]
 
 export async function GET(request: NextRequest) {
-  /*
-   * This minimal handler returns ALL mock requests.
-   * It never crashes – bad query strings are ignored
-   * and any unexpected failure is reported as JSON.
-   */
   try {
-    // ------ optional query params (ignored for now) ------
-    // const { searchParams } = new URL(request.url)
-    // const status       = searchParams.get("status") ?? "all"
-    // const submittedBy  = searchParams.get("submittedBy") ?? ""
-    // const dateFrom     = searchParams.get("dateFrom") ?? ""
-    // const dateTo       = searchParams.get("dateTo") ?? ""
-    // ------------------------------------------------------
-
     // Simply return everything in mock DB
     return createApiResponse({
       requests: vehicleRequests,
@@ -133,13 +134,8 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      if (action === "approve" && updateData.vehicleAssigned) {
-        request.vehicleAssigned = updateData.vehicleAssigned
-      }
-
-      if (action === "approve" && updateData.driverAssigned) {
-        request.driverAssigned = updateData.driverAssigned
-      }
+      // HOD only approves/rejects - no vehicle assignment
+      // Vehicle assignment is handled separately by Transport Head
 
       return createApiResponse({
         message: `Request ${action}d successfully`,

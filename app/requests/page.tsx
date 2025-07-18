@@ -189,9 +189,14 @@ export default function RequestsPage() {
   const router = useRouter()
 
   useEffect(() => {
-    // Check authentication
+    // Check authentication - try multiple sources
+    const username = localStorage.getItem("username")
+    const role = localStorage.getItem("role")
     const userData = localStorage.getItem("user")
-    if (userData) {
+
+    if (username && role) {
+      setCurrentUser({ username, role })
+    } else if (userData) {
       try {
         const user = JSON.parse(userData)
         setCurrentUser(user)
@@ -314,8 +319,17 @@ export default function RequestsPage() {
     }
   }
 
-  const canApprove = currentUser?.role === "admin" || ["hod", "transport"].includes(currentUser?.role?.toLowerCase())
-  const canAssignVehicle = currentUser?.role === "admin" || currentUser?.role?.toLowerCase() === "transport"
+  // Role-based permissions
+  const isHOD = currentUser?.role === "HOD" || currentUser?.role?.toLowerCase() === "hod"
+  const isTransportHead =
+    currentUser?.role === "Transport Head" || currentUser?.role?.toLowerCase() === "transport head"
+  const isAdmin = currentUser?.role === "admin"
+
+  // HOD can approve/reject pending requests
+  const canApprove = isHOD || isAdmin
+
+  // Transport Head can assign vehicles to approved requests
+  const canAssignVehicle = isTransportHead || isAdmin
 
   const handleLogout = () => {
     localStorage.removeItem("token")
@@ -609,32 +623,16 @@ export default function RequestsPage() {
                                   </div>
                                 )}
 
-                                {/* Action Buttons */}
+                                {/* HOD Actions - Approve/Reject only */}
                                 {canApprove && selectedRequest.status === "pending" && (
                                   <div className="border-t pt-4">
-                                    <Label className="font-medium">Actions</Label>
+                                    <Label className="font-medium">HOD Actions</Label>
                                     <div className="mt-4 space-y-4">
                                       <Textarea
                                         placeholder="Add a comment..."
                                         value={actionData.comment}
                                         onChange={(e) => setActionData({ ...actionData, comment: e.target.value })}
                                       />
-                                      <div className="grid grid-cols-2 gap-4">
-                                        <Input
-                                          placeholder="Vehicle Number (if approving)"
-                                          value={actionData.vehicleAssigned}
-                                          onChange={(e) =>
-                                            setActionData({ ...actionData, vehicleAssigned: e.target.value })
-                                          }
-                                        />
-                                        <Input
-                                          placeholder="Driver Name (if approving)"
-                                          value={actionData.driverAssigned}
-                                          onChange={(e) =>
-                                            setActionData({ ...actionData, driverAssigned: e.target.value })
-                                          }
-                                        />
-                                      </div>
                                       <div className="flex space-x-2">
                                         <Button
                                           onClick={() => handleAction("approve", selectedRequest.id)}
@@ -657,12 +655,12 @@ export default function RequestsPage() {
                                   </div>
                                 )}
 
-                                {/* Vehicle Assignment for Transport Head */}
+                                {/* Transport Head Actions - Vehicle Assignment */}
                                 {canAssignVehicle &&
                                   selectedRequest.status === "approved" &&
                                   !selectedRequest.vehicleAssigned && (
                                     <div className="border-t pt-4">
-                                      <Label className="font-medium">Assign Vehicle</Label>
+                                      <Label className="font-medium">Transport Head - Assign Vehicle</Label>
                                       <div className="mt-4 space-y-4">
                                         <Textarea
                                           placeholder="Add a comment..."
@@ -698,12 +696,12 @@ export default function RequestsPage() {
                                     </div>
                                   )}
 
-                                {/* Update Vehicle Assignment for Transport Head */}
+                                {/* Transport Head Actions - Update Vehicle Assignment */}
                                 {canAssignVehicle &&
                                   selectedRequest.status === "approved" &&
                                   selectedRequest.vehicleAssigned && (
                                     <div className="border-t pt-4">
-                                      <Label className="font-medium">Update Vehicle Assignment</Label>
+                                      <Label className="font-medium">Transport Head - Update Vehicle Assignment</Label>
                                       <div className="mt-4 space-y-4">
                                         <Textarea
                                           placeholder="Add a comment..."
